@@ -1,5 +1,6 @@
 package main
 
+/// Importing 
 import (
 	"context"
 	"encoding/json"
@@ -8,18 +9,19 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// Creating a template for Participant
 type Participant struct {
 	Name  string `json:"Name" bson:"Name"`
 	Email string `json:"Email" bson:"Email"`
 	RSVP  string `json:"RSVP" bson:"RSVP"`
 }
 
+// Creating a template for Meeting
 type Meeting struct {
 	Id                int           `json:"Id" bson:"Id"`
 	Title             string        `json:"Title" bson:"Title"`
@@ -29,20 +31,28 @@ type Meeting struct {
 	CreationTimestamp time.Time     `json:"CreationTimestamp" bson:"CreationTimestamp"`
 }
 
-var Participants []Participant
 
+// homepage
 func homePage(w http.ResponseWriter, r *http.Request) {
-	fmt.Println( r.Method)
 	fmt.Fprintf(w, "Welcome to the Meeting Schedule API!")
 }
 
+// handling requests
 func handleRequests() {
+	// Either create a new meeting or search existing meetings based on query parameter.
 	http.HandleFunc("/meetings", handleMeetingsPath)
+
+	// get meeting with given ID using path parameter
 	http.HandleFunc("/meetings/", getMeetingWithId)
+
+	// homepage  for default route
 	http.HandleFunc("/", homePage)
+	
 	log.Fatal(http.ListenAndServe(":10000", nil))
 }
 
+
+// Either create a new meeting or search existing meetings based on GET and POST .
 func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
@@ -52,7 +62,7 @@ func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 			http.Error(w, parseError.Error(), http.StatusBadRequest)
 			return
 		}
-
+         // creating a new meeting
 		createMeeting(meeting, w);
 	
 	case "GET":
@@ -60,6 +70,7 @@ func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 		endTimeQuery := r.URL.Query()["end"]
 
 		participantEmailPath := r.URL.Query()["participant"]
+
 		// pagination
 		limitQuery := r.URL.Query()["limit"]
 
@@ -70,7 +81,6 @@ func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 
 			getMeetingsByTimeRange(startTime, endTime, limit, w)
 		} else if participantEmailPath != nil {
-
 			participantEmail := participantEmailPath[0]
 			limit, _ := strconv.Atoi(limitQuery[0])
 
@@ -83,6 +93,8 @@ func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+
+// get all the meetings within a time range
 func getMeetingsByTimeRange(startTime string, endTime string, limitQuery int,  w http.ResponseWriter) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
@@ -97,7 +109,6 @@ func getMeetingsByTimeRange(startTime string, endTime string, limitQuery int,  w
 	meetingsCollection := client.Database("Collaboration").Collection("Meetings")
 
 	fmt.Println("Endpoint Hit: Time frame")
-	json.NewEncoder(w).Encode(Participants)
 	options := options.Find()
 	options.SetLimit(int64(limitQuery))
 
@@ -119,7 +130,7 @@ func getMeetingsByTimeRange(startTime string, endTime string, limitQuery int,  w
 	w.Write(res)
 }
 
-
+// get all the meetings with a given Email Id
 func getMeetingsByPartcipantsEmail(participantEmail string, limitQuery int, w http.ResponseWriter) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
@@ -151,7 +162,7 @@ func getMeetingsByPartcipantsEmail(participantEmail string, limitQuery int, w ht
 	w.Write(res)
 }
 
-
+// to check whether a meeting is valid or not 
 func checkMeetingValidity(meeting Meeting) {
 	participantsList := meeting.Participants
 
@@ -163,6 +174,7 @@ func checkMeetingValidity(meeting Meeting) {
 
 }
 
+// creating a new meeeting
 func createMeeting(meeting Meeting, w http.ResponseWriter) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
@@ -189,17 +201,7 @@ func createMeeting(meeting Meeting, w http.ResponseWriter) {
 	w.Write(res)
 }
 
-func getFirstParam(path string) (ps string) {
-	// ignore first '/' and when it hits the second '/'
-	// get whatever is after it as a parameter
-	for i := 1; i < len(path); i++ {
-		if path[i] == '/' {
-			ps = path[i+1:]
-		}
-	}
-	return
-}
-
+// get all the meetings with a given ID
 func getMeetingWithId(w http.ResponseWriter, r *http.Request) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
@@ -213,6 +215,7 @@ func getMeetingWithId(w http.ResponseWriter, r *http.Request) {
 	defer client.Disconnect(ctx)
 
 	// pagination
+
 	limitQuery := r.URL.Query()["limit"]
 	limit, _ := strconv.Atoi(limitQuery[0])
 	options := options.Find()
@@ -236,6 +239,18 @@ func getMeetingWithId(w http.ResponseWriter, r *http.Request) {
 	w.Write(res)
 }
 
+func getFirstParam(path string) (ps string) {
+	// ignore first '/' and when it hits the second '/'
+	// get whatever is after it as a parameter
+	for i := 1; i < len(path); i++ {
+		if path[i] == '/' {
+			ps = path[i+1:]
+		}
+	}
+	return
+}
+
+// main func
 func main() {
 	handleRequests()
 }
