@@ -52,6 +52,7 @@ func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 			http.Error(w, parseError.Error(), http.StatusBadRequest)
 			return
 		}
+
 		createMeeting(meeting, w);
 	
 	case "GET":
@@ -148,6 +149,18 @@ func getMeetingsByPartcipantsEmail(participantEmail string, limitQuery int, w ht
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(res)
+}
+
+
+func checkMeetingValidity(meeting Meeting) {
+	participantsList := meeting.Participants
+
+	for _, participant := range participantsList {
+		fmt.Println(participant)
+		// get all the meetings of each participant 
+		// compare it with overlapping times
+	}
+
 }
 
 func createMeeting(meeting Meeting, w http.ResponseWriter) {
