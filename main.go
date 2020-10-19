@@ -199,10 +199,16 @@ func getMeetingWithId(w http.ResponseWriter, r *http.Request) {
 	}
 	defer client.Disconnect(ctx)
 
+	// pagination
+	limitQuery := r.URL.Query()["limit"]
+	limit, _ := strconv.Atoi(limitQuery[0])
+	options := options.Find()
+	options.SetLimit(int64(limit))
+
 	meetingsCollection := client.Database("Collaboration").Collection("Meetings")
 
 	meetingId, err := strconv.Atoi(getFirstParam(r.URL.Path))
-	filtCursor, err := meetingsCollection.Find(ctx, bson.M{"Id": meetingId})
+	filtCursor, err := meetingsCollection.Find(ctx, bson.M{"Id": meetingId}, options)
 	if err != nil {
 		log.Fatal(err)
 	}
