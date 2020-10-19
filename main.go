@@ -75,19 +75,6 @@ func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func connectToMongo() {
-	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	err = client.Connect(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return
-}
-
 func getMeetingsByTimeRange(startTime string, endTime string, w http.ResponseWriter) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
@@ -121,7 +108,6 @@ func getMeetingsByTimeRange(startTime string, endTime string, w http.ResponseWri
 	w.Header().Set("Content-Type", "application/json")
 	// w.WriteHeader(http.StatusOK)
 	w.Write(res)
-
 }
 
 
