@@ -55,18 +55,25 @@ func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 		createMeeting(meeting, w);
 	
 	case "GET":
-		startTimePath := r.URL.Query()["start"]
-		endTimePath := r.URL.Query()["end"]
+		startTimeQuery := r.URL.Query()["start"]
+		endTimeQuery := r.URL.Query()["end"]
 
 		participantEmailPath := r.URL.Query()["participant"]
+		// pagination
+		limitQuery := r.URL.Query()["limit"]
 
-		if startTimePath != nil && endTimePath != nil {
-			endTime := endTimePath[0]
-			startTime := startTimePath[0]
-			getMeetingsByTimeRange(startTime, endTime, w)
+		if startTimeQuery != nil && endTimeQuery != nil {
+			endTime := endTimeQuery[0]
+			startTime := startTimeQuery[0]
+			limit, _ := strconv.Atoi(limitQuery[0])
+
+			getMeetingsByTimeRange(startTime, endTime, limit, w)
 		} else if participantEmailPath != nil {
+
 			participantEmail := participantEmailPath[0]
-			getMeetingsByPartcipantsEmail(participantEmail, w)
+			limit, _ := strconv.Atoi(limitQuery[0])
+
+			getMeetingsByPartcipantsEmail(participantEmail, limit, w)
 		}
 
 	default:
@@ -75,7 +82,7 @@ func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getMeetingsByTimeRange(startTime string, endTime string, w http.ResponseWriter) {
+func getMeetingsByTimeRange(startTime string, endTime string, limitQuery int,  w http.ResponseWriter) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
 		log.Fatal(err)
@@ -90,9 +97,10 @@ func getMeetingsByTimeRange(startTime string, endTime string, w http.ResponseWri
 
 	fmt.Println("Endpoint Hit: Time frame")
 	json.NewEncoder(w).Encode(Participants)
+	options := options.Find()
+	options.SetLimit(int64(limitQuery))
 
-	filtCursor, err := meetingsCollection.Find(ctx,
-		bson.M{"StartTime": bson.M{"$gte": startTime}, "EndTime": bson.M{"$lte": endTime}})
+	filtCursor, err := meetingsCollection.Find(ctx, bson.M{"StartTime": bson.M{"$gte": startTime}, "EndTime": bson.M{"$lte": endTime}}, options)
 
 	if err != nil {
 		log.Fatal(err)
@@ -106,12 +114,12 @@ func getMeetingsByTimeRange(startTime string, endTime string, w http.ResponseWri
 
 	res, _ := json.Marshal(meetingFiltered)
 	w.Header().Set("Content-Type", "application/json")
-	// w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusOK)
 	w.Write(res)
 }
 
 
-func getMeetingsByPartcipantsEmail(participantEmail string, w http.ResponseWriter) {
+func getMeetingsByPartcipantsEmail(participantEmail string, limitQuery int, w http.ResponseWriter) {
 	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
 		log.Fatal(err)
@@ -125,7 +133,9 @@ func getMeetingsByPartcipantsEmail(participantEmail string, w http.ResponseWrite
 	meetingsCollection := client.Database("Collaboration").Collection("Meetings")
 
 	fmt.Println(participantEmail)
-	filtCursor, err := meetingsCollection.Find(ctx, bson.M{"Participants": bson.M{"$elemMatch": bson.M{"Email": participantEmail }}})
+	options := options.Find()
+	options.SetLimit(int64(limitQuery))
+	filtCursor, err := meetingsCollection.Find(ctx, bson.M{"Participants": bson.M{"$elemMatch": bson.M{"Email": participantEmail }}}, options)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -162,7 +172,7 @@ func createMeeting(meeting Meeting, w http.ResponseWriter) {
 
 	res, _ := json.Marshal(insertResult)
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 	w.Write(res)
 }
 
