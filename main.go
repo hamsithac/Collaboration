@@ -62,8 +62,14 @@ func handleMeetingsPath (w http.ResponseWriter, r *http.Request) {
 			http.Error(w, parseError.Error(), http.StatusBadRequest)
 			return
 		}
-         // creating a new meeting
-		createMeeting(meeting, w);
+
+		if checkMeetingValidity(meeting) {
+            // creating a new meeting
+		    createMeeting(meeting, w);
+		} else {
+			fmt.Fprintf(w, "Some paticipants have conflicting meetings")
+		}
+
 	
 	case "GET":
 		startTimeQuery := r.URL.Query()["start"]
@@ -163,15 +169,50 @@ func getMeetingsByPartcipantsEmail(participantEmail string, limitQuery int, w ht
 }
 
 // to check whether a meeting is valid or not 
-func checkMeetingValidity(meeting Meeting) {
-	participantsList := meeting.Participants
+func checkMeetingValidity(meeting Meeting) (isValid bool){
+	client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.Connect(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Disconnect(ctx)
+	meetingsCollection := client.Database("Collaboration").Collection("Meetings")
 
+	participantsList := meeting.Participants
+	newMeetingstartTime := meeting.StartTime
+	//newMeetingendTime := meeting.EndTime
+
+	isMeetingValid := true
 	for _, participant := range participantsList {
-		fmt.Println(participant)
-		// get all the meetings of each participant 
-		// compare it with overlapping times
+		// get meetings of participant where the start time of current meeting is later than 
+
+		filtCursor, err := meetingsCollection.Find(ctx, 
+			bson.M{
+				"StartTime": bson.M{"$lte": newMeetingstartTime},
+				"EndTime": bson.M{"$gte": newMeetingstartTime},
+				"Participants": bson.M{"$elemMatch": bson.M{"Email": participant.Email}},
+			})
+
+	    if err != nil {
+		   log.Fatal(err)
+	    }
+	    var meetingFiltered []bson.M
+	    if err = filtCursor.All(ctx, &meetingFiltered); err != nil {
+		   log.Fatal(err)
+	    }
+
+
+		if len(meetingFiltered) > 0 {
+		   // if overlapping meetings are present
+		   isMeetingValid = false
+		}
 	}
 
+	return isMeetingValid
 }
 
 // creating a new meeeting
